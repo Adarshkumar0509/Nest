@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@apollo/client/react'
+import { BreadcrumbStyleProvider } from 'contexts/BreadcrumbContext'
 import { useParams } from 'next/navigation'
 import { useEffect } from 'react'
 import { ErrorDisplay, handleAppError } from 'app/global-error'
@@ -8,7 +9,12 @@ import { GetProgramAndModulesDocument } from 'types/__generated__/programsQuerie
 
 import { titleCaseWord } from 'utils/capitalize'
 import { formatDate } from 'utils/dateFormatter'
-import DetailsCard from 'components/CardDetailsPage'
+import Header from 'components/cards/Header'
+import Metadata from 'components/cards/Metadata'
+import PageWrapper from 'components/cards/PageWrapper'
+import RepositoriesModules from 'components/cards/RepositoriesModules'
+import Summary from 'components/cards/Summary'
+import Tags from 'components/cards/Tags'
 import LoadingSpinner from 'components/LoadingSpinner'
 
 const ProgramDetailsPage = () => {
@@ -66,17 +72,25 @@ const ProgramDetailsPage = () => {
   ]
 
   return (
-    <DetailsCard
-      admins={program.admins}
-      details={programDetails}
-      domains={program.domains}
-      modules={modules}
-      recentMilestones={program.recentMilestones}
-      summary={program.description}
-      tags={program.tags}
-      title={program.name}
-      type="program"
-    />
+    <BreadcrumbStyleProvider className="bg-white dark:bg-[#212529]">
+      <PageWrapper>
+        <Header
+          title={program.name}
+          admins={program.admins ?? undefined}
+          isActive={true}
+          isArchived={false}
+          showProgramActions={false}
+        />
+
+        <Summary summary={program.description} />
+
+        <Metadata details={programDetails} detailsTitle="Program Details" />
+
+        <Tags tags={program.tags ?? undefined} domains={program.domains ?? undefined} />
+
+        <RepositoriesModules modules={modules} />
+      </PageWrapper>
+    </BreadcrumbStyleProvider>
   )
 }
 

@@ -10,11 +10,11 @@ import { ErrorDisplay, handleAppError } from 'app/global-error'
 import { ProgramStatusEnum } from 'types/__generated__/graphql'
 import { UpdateProgramDocument } from 'types/__generated__/programsMutations.generated'
 import {
+  GetManagementProgramDetailsDocument,
   GetMyProgramsDocument,
-  GetProgramDetailsDocument,
 } from 'types/__generated__/programsQueries.generated'
-import type { ExtendedSession } from 'types/auth'
 import { formatDateForInput } from 'utils/dateFormatter'
+import { extractGraphQLErrors, isAccessDeniedGraphQLError } from 'utils/helpers/handleGraphQLError'
 import { parseCommaSeparated } from 'utils/parser'
 import LoadingSpinner from 'components/LoadingSpinner'
 import ProgramForm from 'components/ProgramForm'
@@ -26,36 +26,67 @@ const EditProgramPage = () => {
   const [updateProgram, { loading: mutationLoading }] = useMutation(UpdateProgramDocument)
   const {
     data,
-    error,
+    error: queryError,
     loading: queryLoading,
-  } = useQuery(GetProgramDetailsDocument, {
+  } = useQuery(GetManagementProgramDetailsDocument, {
     variables: { programKey },
     skip: !programKey,
     fetchPolicy: 'network-only',
   })
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    menteesLimit: 0,
-    startedAt: '',
-    endedAt: '',
-    tags: '',
-    domains: '',
+  const [formData, setFormData] = useState<{
+    adminLogins?: string
+    description: string
+    domains: string
+    endedAt: string
+    menteesLimit: number
+    name: string
+    startedAt: string
+    status?: string
+    tags: string
+  }>({
     adminLogins: '',
+    description: '',
+    domains: '',
+    endedAt: '',
+    menteesLimit: 0,
+    name: '',
+    startedAt: '',
     status: ProgramStatusEnum.Draft,
+    tags: '',
   })
-  const [accessStatus, setAccessStatus] = useState<'checking' | 'allowed' | 'denied'>('checking')
+  const [accessStatus, setAccessStatus] = useState<
+    'checking' | 'allowed' | 'denied' | 'error' | 'notFound'
+  >('checking')
   useEffect(() => {
     if (sessionStatus === 'loading' || queryLoading) {
       return
     }
-    if (!data?.getProgram || sessionStatus === 'unauthenticated') {
+    if (queryError && isAccessDeniedGraphQLError(queryError)) {
+      setAccessStatus('denied')
+      return
+    }
+    if (queryError) {
+      setAccessStatus('error')
+      return
+    }
+
+    if (sessionStatus === 'unauthenticated') {
       setAccessStatus('denied')
       return
     }
 
-    const isAdmin = data.getProgram.admins?.some(
-      (admin: { login: string }) => admin.login === (session as ExtendedSession)?.user?.login
+    if (!data?.managementProgram) {
+      setAccessStatus('notFound')
+      return
+    }
+
+    const userLogin: string | undefined =
+      session?.user && 'login' in session.user
+        ? (session.user as { login?: string }).login
+        : undefined
+
+    const isAdmin = data.managementProgram.admins?.some(
+      (admin: { login: string }) => admin.login === userLogin
     )
 
     if (isAdmin) {
@@ -71,10 +102,10 @@ const EditProgramPage = () => {
       })
       setTimeout(() => router.replace('/my/mentorship/programs'), 1500)
     }
-  }, [sessionStatus, session, data, queryLoading, router])
+  }, [sessionStatus, session, data, queryLoading, router, queryError])
   useEffect(() => {
-    if (accessStatus === 'allowed' && data?.getProgram) {
-      const { getProgram: program } = data
+    if (accessStatus === 'allowed' && data?.managementProgram) {
+      const { managementProgram: program } = data
       setFormData({
         name: program.name || '',
         description: program.description || '',
@@ -88,24 +119,22 @@ const EditProgramPage = () => {
           .join(', '),
         status: program.status || ProgramStatusEnum.Draft,
       })
-    } else if (error) {
-      handleAppError(error)
     }
-  }, [accessStatus, data, error])
+  }, [accessStatus, data])
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
       const input = {
-        key: programKey,
-        name: formData.name,
-        description: formData.description,
-        menteesLimit: Number(formData.menteesLimit),
-        startedAt: formData.startedAt,
-        endedAt: formData.endedAt,
-        tags: parseCommaSeparated(formData.tags),
-        domains: parseCommaSeparated(formData.domains),
         adminLogins: parseCommaSeparated(formData.adminLogins),
-        status: formData.status,
+        description: formData.description,
+        domains: parseCommaSeparated(formData.domains),
+        endedAt: formData.endedAt,
+        key: programKey,
+        menteesLimit: Number(formData.menteesLimit),
+        name: formData.name,
+        startedAt: formData.startedAt,
+        status: (formData.status ?? ProgramStatusEnum.Draft) as ProgramStatusEnum,
+        tags: parseCommaSeparated(formData.tags),
       }
 
       const result = await updateProgram({
@@ -125,25 +154,45 @@ const EditProgramPage = () => {
 
       router.push(`/my/mentorship/programs/${updatedProgramKey}`)
     } catch (err) {
-      addToast({
-        title: 'Update Failed',
-        description: 'There was an error updating the program.',
-        color: 'danger',
-        variant: 'solid',
-        timeout: 3000,
-      })
-      handleAppError(err)
+      const { hasValidationErrors } = extractGraphQLErrors(err)
+      if (!hasValidationErrors) {
+        addToast({
+          title: 'Update Failed',
+          description: 'There was an error updating the program.',
+          color: 'danger',
+          variant: 'solid',
+          timeout: 3000,
+        })
+        handleAppError(err)
+      }
+      throw err
     }
   }
   if (accessStatus === 'checking') {
     return <LoadingSpinner />
+  }
+  if (accessStatus === 'error') {
+    const message =
+      queryError instanceof Error
+        ? queryError.message
+        : 'Failed to load program. Please try again later.'
+    return <ErrorDisplay statusCode={500} title="Error Loading Program" message={message} />
+  }
+  if (accessStatus === 'notFound') {
+    return (
+      <ErrorDisplay
+        statusCode={404}
+        title="Program Not Found"
+        message="Sorry, the program you're looking for doesn't exist."
+      />
+    )
   }
   if (accessStatus === 'denied') {
     return (
       <ErrorDisplay
         statusCode={403}
         title="Access Denied"
-        message="You do not have permission to view this page. You will be redirected."
+        message="You do not have permission to edit this program."
       />
     )
   }
@@ -156,7 +205,6 @@ const EditProgramPage = () => {
       title="Edit Program"
       submitText="Save"
       isEdit={true}
-      currentProgramKey={programKey}
     />
   )
 }

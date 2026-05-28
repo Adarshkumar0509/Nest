@@ -1,10 +1,5 @@
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
-export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
-export type MakeOptional<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]?: Maybe<T[SubKey]> };
-export type MakeMaybe<T, K extends keyof T> = Omit<T, K> & { [SubKey in K]: Maybe<T[SubKey]> };
-export type MakeEmpty<T extends { [key: string]: unknown }, K extends keyof T> = { [_ in K]?: never };
-export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' | '__typename' ? T[P] : never };
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
   ID: { input: string; output: string; }
@@ -15,7 +10,15 @@ export type Scalars = {
   Date: { input: string | number; output: string | number; }
   DateTime: { input: string | number; output: string | number; }
   JSON: { input: Record<string, unknown>; output: Record<string, unknown>; }
-  UUID: { input: any; output: any; }
+  UUID: { input: unknown; output: unknown; }
+};
+
+export type AdminNode = {
+  __typename?: 'AdminNode';
+  avatarUrl: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  login: Scalars['String']['output'];
+  name: Scalars['String']['output'];
 };
 
 export type ApiKeyNode = Node & {
@@ -63,7 +66,7 @@ export type ChapterNode = Node & {
   contributionData: Scalars['JSON']['output'];
   contributionStats?: Maybe<Scalars['JSON']['output']>;
   country: Scalars['String']['output'];
-  createdAt: Scalars['Float']['output'];
+  createdAt: Scalars['String']['output'];
   entityLeaders: Array<EntityMemberNode>;
   geoLocation?: Maybe<GeoLocationType>;
   /** The Globally Unique ID of this object */
@@ -80,14 +83,14 @@ export type ChapterNode = Node & {
   summary: Scalars['String']['output'];
   tags: Scalars['JSON']['output'];
   topContributors: Array<RepositoryContributorNode>;
-  updatedAt: Scalars['Float']['output'];
+  updatedAt: Scalars['String']['output'];
   url: Scalars['String']['output'];
 };
 
 export type CommitteeNode = Node & {
   __typename?: 'CommitteeNode';
   contributorsCount: Scalars['Int']['output'];
-  createdAt?: Maybe<Scalars['Float']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
   entityLeaders: Array<EntityMemberNode>;
   forksCount: Scalars['Int']['output'];
   /** The Globally Unique ID of this object */
@@ -100,7 +103,7 @@ export type CommitteeNode = Node & {
   starsCount: Scalars['Int']['output'];
   summary: Scalars['String']['output'];
   topContributors: Array<RepositoryContributorNode>;
-  updatedAt: Scalars['Float']['output'];
+  updatedAt: Scalars['String']['output'];
   url: Scalars['String']['output'];
 };
 
@@ -227,8 +230,15 @@ export type IssueNode = Node & {
   pullRequests: Array<PullRequestNode>;
   repositoryName?: Maybe<Scalars['String']['output']>;
   state: Scalars['String']['output'];
+  taskDeadline?: Maybe<Scalars['DateTime']['output']>;
   title: Scalars['String']['output'];
   url: Scalars['String']['output'];
+};
+
+
+export type IssueNodePullRequestsArgs = {
+  limit?: Scalars['Int']['input'];
+  offset?: Scalars['Int']['input'];
 };
 
 export type LogoutResult = {
@@ -318,9 +328,11 @@ export type ModuleNode = {
   mentees: Array<UserNode>;
   mentors: Array<MentorNode>;
   name: Scalars['String']['output'];
+  order: Scalars['Int']['output'];
   program?: Maybe<ProgramNode>;
   projectId?: Maybe<Scalars['ID']['output']>;
   projectName?: Maybe<Scalars['String']['output']>;
+  recentPullRequests: Array<PullRequestNode>;
   startedAt: Scalars['DateTime']['output'];
   tags?: Maybe<Array<Scalars['String']['output']>>;
   taskAssignedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -355,6 +367,12 @@ export type ModuleNodeIssuesCountArgs = {
 };
 
 
+export type ModuleNodeRecentPullRequestsArgs = {
+  limit?: Scalars['Int']['input'];
+  offset?: Scalars['Int']['input'];
+};
+
+
 export type ModuleNodeTaskAssignedAtArgs = {
   issueNumber: Scalars['Int']['input'];
 };
@@ -371,8 +389,10 @@ export type Mutation = {
   createApiKey: CreateApiKeyResult;
   createModule: ModuleNode;
   createProgram: ProgramNode;
+  deleteModule: Scalars['String']['output'];
   githubAuth: GitHubAuthResult;
   logoutUser: LogoutResult;
+  reorderModules: Array<ModuleNode>;
   revokeApiKey: RevokeApiKeyResult;
   setTaskDeadline: ModuleNode;
   unassignIssueFromUser: ModuleNode;
@@ -413,8 +433,19 @@ export type MutationCreateProgramArgs = {
 };
 
 
+export type MutationDeleteModuleArgs = {
+  moduleKey: Scalars['String']['input'];
+  programKey: Scalars['String']['input'];
+};
+
+
 export type MutationGithubAuthArgs = {
   accessToken: Scalars['String']['input'];
+};
+
+
+export type MutationReorderModulesArgs = {
+  inputData: ReorderModulesInput;
 };
 
 
@@ -521,7 +552,7 @@ export type PostNode = Node & {
 
 export type ProgramNode = {
   __typename?: 'ProgramNode';
-  admins?: Maybe<Array<MentorNode>>;
+  admins?: Maybe<Array<AdminNode>>;
   description: Scalars['String']['output'];
   domains?: Maybe<Array<Scalars['String']['output']>>;
   endedAt: Scalars['DateTime']['output'];
@@ -648,7 +679,7 @@ export type ProjectNode = Node & {
   topContributors: Array<RepositoryContributorNode>;
   topics: Array<Scalars['String']['output']>;
   type: Scalars['String']['output'];
-  updatedAt: Scalars['Float']['output'];
+  updatedAt: Scalars['String']['output'];
   url: Scalars['String']['output'];
 };
 
@@ -683,6 +714,7 @@ export type Query = {
   boardOfDirectors?: Maybe<BoardOfDirectorsNode>;
   boardsOfDirectors: Array<BoardOfDirectorsNode>;
   chapter?: Maybe<ChapterNode>;
+  chapterCountries: Array<Scalars['String']['output']>;
   committee?: Maybe<CommitteeNode>;
   getMenteeDetails?: Maybe<MenteeNode>;
   getMenteeModuleIssues: Array<IssueNode>;
@@ -692,6 +724,9 @@ export type Query = {
   getProjectModules: Array<ModuleNode>;
   isMentor: Scalars['Boolean']['output'];
   isProjectLeader: Scalars['Boolean']['output'];
+  managementModule?: Maybe<ModuleNode>;
+  managementProgram?: Maybe<ProgramNode>;
+  managementProgramModules: Array<ModuleNode>;
   memberSnapshot?: Maybe<MemberSnapshotNode>;
   memberSnapshots: Array<MemberSnapshotNode>;
   myPrograms: PaginatedPrograms;
@@ -786,6 +821,22 @@ export type QueryIsMentorArgs = {
 
 export type QueryIsProjectLeaderArgs = {
   login: Scalars['String']['input'];
+};
+
+
+export type QueryManagementModuleArgs = {
+  moduleKey: Scalars['String']['input'];
+  programKey: Scalars['String']['input'];
+};
+
+
+export type QueryManagementProgramArgs = {
+  programKey: Scalars['String']['input'];
+};
+
+
+export type QueryManagementProgramModulesArgs = {
+  programKey: Scalars['String']['input'];
 };
 
 
@@ -948,6 +999,11 @@ export type ReleaseNode = Node & {
   url: Scalars['String']['output'];
 };
 
+export type ReorderModulesInput = {
+  moduleKeys: Array<Scalars['String']['input']>;
+  programKey: Scalars['String']['input'];
+};
+
 export type RepositoryContributorNode = {
   __typename?: 'RepositoryContributorNode';
   avatarUrl: Scalars['String']['output'];
@@ -1074,14 +1130,14 @@ export type UpdateProgramStatusInput = {
 export type UserNode = {
   __typename?: 'UserNode';
   avatarUrl: Scalars['String']['output'];
-  badgeCount: Scalars['Int']['output'];
   badges: Array<BadgeNode>;
   bio: Scalars['String']['output'];
   company: Scalars['String']['output'];
+  contributionData?: Maybe<Scalars['JSON']['output']>;
   contributionsCount: Scalars['Int']['output'];
-  createdAt: Scalars['Float']['output'];
+  createdAt: Scalars['String']['output'];
   email: Scalars['String']['output'];
-  firstOwaspContributionAt?: Maybe<Scalars['Float']['output']>;
+  firstOwaspContributionAt?: Maybe<Scalars['String']['output']>;
   followersCount: Scalars['Int']['output'];
   followingCount: Scalars['Int']['output'];
   id: Scalars['ID']['output'];
@@ -1096,6 +1152,6 @@ export type UserNode = {
   name: Scalars['String']['output'];
   publicRepositoriesCount: Scalars['Int']['output'];
   releasesCount: Scalars['Int']['output'];
-  updatedAt: Scalars['Float']['output'];
+  updatedAt: Scalars['String']['output'];
   url: Scalars['String']['output'];
 };

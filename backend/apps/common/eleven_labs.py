@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from typing import TYPE_CHECKING
 
@@ -11,8 +10,6 @@ from elevenlabs.types.voice_settings import VoiceSettings
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ElevenLabs:
@@ -23,10 +20,10 @@ class ElevenLabs:
         model_id: str = "eleven_multilingual_v2",
         output_format: str = "mp3_44100_128",
         similarity_boost: float = 0.75,
-        speed: float = 1.0,
+        speed: float = 0.85,
         stability: float = 0.5,
         style: float = 0.0,
-        voice_id: str = "1SM7GgM6IMuvQlz2BwM3",  # cspell:disable-line
+        voice_id: str = "TX3LPaxmHKxFdv7VOQHJ",  # Liam # cspell:disable-line
         *,
         use_speaker_boost: bool = True,
     ) -> None:
@@ -36,7 +33,7 @@ class ElevenLabs:
             model_id (str): The model to use.
             output_format (str): Audio output format.
             similarity_boost (float): Voice consistency (0.0-1.0).
-            speed (float): Speech speed (0.25-4.0, default 1.0).
+            speed (float): Speech speed (0.25-4.0).
             stability (float): Voice stability (0.0-1.0).
             style (float): Style exaggeration (0.0-1.0).
             use_speaker_boost (bool): Enable speaker clarity boost.

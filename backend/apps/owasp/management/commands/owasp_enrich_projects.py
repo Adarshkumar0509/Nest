@@ -1,14 +1,10 @@
 """A command to update OWASP projects related repositories data."""
 
-import logging
-
 from django.core.management.base import BaseCommand
 
 from apps.common.open_ai import OpenAi
 from apps.core.models.prompt import Prompt
 from apps.owasp.models.project import Project
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -47,7 +43,7 @@ class Command(BaseCommand):
         offset = options["offset"]
         for idx, project in enumerate(active_projects[offset:]):
             prefix = f"{idx + offset + 1} of {active_projects_count - offset}"
-            print(f"{prefix:<10} {project.owasp_url}")
+            self.stdout.write(f"{prefix:<10} {project.owasp_url}\n")
 
             # Generate summary
             if update_summary and (prompt := Prompt.get_owasp_project_summary()):

@@ -3,10 +3,13 @@ import { axe } from 'jest-axe'
 import { Release } from 'types/release'
 import RecentReleases from 'components/RecentReleases'
 
+const publishedAtIso = new Date(Date.now()).toISOString()
+
 const mockReleases: Release[] = [
   {
+    id: 'release-a11y-1',
     name: 'v1.0 The First Release',
-    publishedAt: Date.now(),
+    publishedAt: publishedAtIso,
     repositoryName: 'our-awesome-project',
     organizationName: 'our-org',
     tagName: 'v1.0',
@@ -17,7 +20,7 @@ const mockReleases: Release[] = [
       avatarUrl: 'https://example.com/avatar.png',
       key: 'testuser',
       contributionsCount: 0,
-      createdAt: 0,
+      createdAt: '1970-01-01T00:00:00.000Z',
       followersCount: 0,
       followingCount: 0,
       publicRepositoriesCount: 0,
@@ -25,8 +28,9 @@ const mockReleases: Release[] = [
     },
   },
   {
+    id: 'release-a11y-2',
     name: 'v2.0 The Second Release',
-    publishedAt: Date.now(),
+    publishedAt: publishedAtIso,
     repositoryName: 'another-cool-project',
     organizationName: 'our-org',
     tagName: 'v2.0',
@@ -37,7 +41,7 @@ const mockReleases: Release[] = [
       avatarUrl: 'https://example.com/avatar2.png',
       key: 'jane-doe',
       contributionsCount: 0,
-      createdAt: 0,
+      createdAt: '1970-01-01T00:00:00.000Z',
       followersCount: 0,
       followingCount: 0,
       publicRepositoriesCount: 0,

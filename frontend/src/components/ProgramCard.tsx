@@ -2,7 +2,10 @@ import { Tooltip } from '@heroui/tooltip'
 import { useUpdateProgramStatus } from 'hooks/useUpdateProgramStatus'
 import Link from 'next/link'
 import type React from 'react'
-import { GetProgramAndModulesDocument } from 'types/__generated__/programsQueries.generated'
+import {
+  GetManagementProgramAndModulesDocument,
+  GetProgramAndModulesDocument,
+} from 'types/__generated__/programsQueries.generated'
 import { Program } from 'types/mentorship'
 import { formatDate } from 'utils/dateFormatter'
 import EntityActions from 'components/EntityActions'
@@ -22,13 +25,16 @@ const ProgramCard: React.FC<ProgramCardProps> = ({ program, href, accessLevel, i
     isAdmin,
     refetchQueries: [
       {
-        query: GetProgramAndModulesDocument,
+        query:
+          accessLevel === 'admin'
+            ? GetManagementProgramAndModulesDocument
+            : GetProgramAndModulesDocument,
         variables: { programKey: program.key },
       },
     ],
   })
 
-  const roleClass = {
+  const roleClass: Record<string, string> = {
     admin: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
     mentor: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
     default: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',

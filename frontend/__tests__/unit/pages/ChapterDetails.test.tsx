@@ -9,13 +9,6 @@ jest.mock('@apollo/client/react', () => ({
   useQuery: jest.fn(),
 }))
 
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useParams: () => ({
-    chapterKey: 'test-chapter',
-  }),
-}))
-
 const mockRouter = {
   push: jest.fn(),
 }
@@ -150,5 +143,142 @@ describe('chapterDetailsPage Component', () => {
       expect(screen.getByText('Bob')).toBeInTheDocument()
       expect(screen.getByText('Chapter Leader')).toBeInTheDocument()
     })
+  })
+
+  test('handles missing suggestedLocation gracefully', async () => {
+    const chapterDataWithoutLocation = {
+      ...mockChapterDetailsData,
+      chapter: {
+        ...mockChapterDetailsData.chapter,
+        suggestedLocation: null,
+      },
+    }
+    ;(useQuery as unknown as jest.Mock).mockReturnValue({
+      data: chapterDataWithoutLocation,
+      error: null,
+    })
+    render(<ChapterDetailsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('OWASP Test Chapter')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Test City, Test Country')).not.toBeInTheDocument()
+  })
+
+  test('handles missing region gracefully', async () => {
+    const chapterDataWithoutRegion = {
+      ...mockChapterDetailsData,
+      chapter: {
+        ...mockChapterDetailsData.chapter,
+        region: null,
+      },
+    }
+    ;(useQuery as unknown as jest.Mock).mockReturnValue({
+      data: chapterDataWithoutRegion,
+      error: null,
+    })
+    render(<ChapterDetailsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('OWASP Test Chapter')).toBeInTheDocument()
+    })
+  })
+
+  test('handles missing suggestedLocation and region gracefully', async () => {
+    const chapterDataWithoutLocationAndRegion = {
+      ...mockChapterDetailsData,
+      chapter: {
+        ...mockChapterDetailsData.chapter,
+        suggestedLocation: undefined,
+        region: undefined,
+      },
+    }
+    ;(useQuery as unknown as jest.Mock).mockReturnValue({
+      data: chapterDataWithoutLocationAndRegion,
+      error: null,
+    })
+    render(<ChapterDetailsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('OWASP Test Chapter')).toBeInTheDocument()
+    })
+  })
+
+  test('renders contributions section when contributionStats total > 0', async () => {
+    const chapterDataWithStats = {
+      ...mockChapterDetailsData,
+      chapter: {
+        ...mockChapterDetailsData.chapter,
+        contributionStats: {
+          commits: 5,
+          pullRequests: 3,
+          issues: 2,
+          releases: 1,
+          total: 11,
+        },
+        contributionData: undefined,
+      },
+    }
+    ;(useQuery as unknown as jest.Mock).mockReturnValue({
+      data: chapterDataWithStats,
+      error: null,
+    })
+    render(<ChapterDetailsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('OWASP Test Chapter')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Chapter Contribution Activity')).toBeInTheDocument()
+  })
+
+  test('does not render contributions section when contributionStats total is 0 and contributionData is empty', async () => {
+    const chapterDataWithZeroStats = {
+      ...mockChapterDetailsData,
+      chapter: {
+        ...mockChapterDetailsData.chapter,
+        contributionStats: {
+          commits: 0,
+          pullRequests: 0,
+          issues: 0,
+          releases: 0,
+          total: 0,
+        },
+        contributionData: {},
+      },
+    }
+    ;(useQuery as unknown as jest.Mock).mockReturnValue({
+      data: chapterDataWithZeroStats,
+      error: null,
+    })
+    render(<ChapterDetailsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('OWASP Test Chapter')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Chapter Contribution Activity')).not.toBeInTheDocument()
+  })
+
+  test('renders contributions section when contributionData is non-empty', async () => {
+    const chapterDataWithContributionData = {
+      ...mockChapterDetailsData,
+      chapter: {
+        ...mockChapterDetailsData.chapter,
+        contributionStats: undefined,
+        contributionData: {
+          '2024-01': 10,
+          '2024-02': 20,
+        },
+      },
+    }
+    ;(useQuery as unknown as jest.Mock).mockReturnValue({
+      data: chapterDataWithContributionData,
+      error: null,
+    })
+    render(<ChapterDetailsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('OWASP Test Chapter')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Chapter Contribution Activity')).toBeInTheDocument()
   })
 })

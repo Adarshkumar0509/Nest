@@ -2,7 +2,6 @@ import { fireEvent, screen } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 import React from 'react'
 import { render } from 'wrappers/testUtil'
-import type { Organization } from 'types/organization'
 import type { RepositoryCardProps } from 'types/project'
 import RepositoryCard from 'components/RepositoryCard'
 
@@ -65,9 +64,9 @@ describe('RepositoryCard', () => {
       collaboratorsCount: 10,
       followersCount: 50,
       publicRepositoriesCount: 20,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    } as Organization,
+      createdAt: new Date(Date.now()).toISOString(),
+      updatedAt: new Date(Date.now()).toISOString(),
+    },
     starsCount: 100 + index,
     subscribersCount: 20 + index,
     url: `https://github.com/org-${index}/repo-${index}`,
@@ -76,6 +75,11 @@ describe('RepositoryCard', () => {
   it('renders without crashing with empty repositories', () => {
     render(<RepositoryCard repositories={[]} />)
     expect(screen.queryByRole('button', { name: /Show/ })).not.toBeInTheDocument()
+  })
+
+  it('returns null when repositories prop is missing', () => {
+    const { container } = render(<RepositoryCard />)
+    expect(container.querySelector('.grid')).toBeNull()
   })
 
   it('shows first 4 repositories initially when there are more than 4', () => {
@@ -337,6 +341,43 @@ describe('RepositoryCard', () => {
       fireEvent.click(repositoryButton)
 
       expect(mockPush).toHaveBeenCalledWith('/organizations/org-0/repositories/repo-0')
+    })
+  })
+
+  describe('Keyboard Navigation', () => {
+    it('navigates to repository page when Enter key is pressed', () => {
+      const repositories = [createMockRepository(0)]
+
+      render(<RepositoryCard repositories={repositories} />)
+
+      const repositoryButton = screen.getByText('Repository 0').closest('button')
+      fireEvent.keyDown(repositoryButton, { key: 'Enter' })
+
+      expect(mockPush).toHaveBeenCalledWith('/organizations/org-0/repositories/repo-0')
+    })
+
+    it('navigates to repository page when Space key is pressed', () => {
+      const repositories = [createMockRepository(0)]
+
+      render(<RepositoryCard repositories={repositories} />)
+
+      const repositoryButton = screen.getByText('Repository 0').closest('button')
+      fireEvent.keyDown(repositoryButton, { key: ' ' })
+
+      expect(mockPush).toHaveBeenCalledWith('/organizations/org-0/repositories/repo-0')
+    })
+
+    it('does not navigate when other keys are pressed', () => {
+      const repositories = [createMockRepository(0)]
+
+      render(<RepositoryCard repositories={repositories} />)
+
+      const repositoryButton = screen.getByText('Repository 0').closest('button')
+      fireEvent.keyDown(repositoryButton, { key: 'Tab' })
+      fireEvent.keyDown(repositoryButton, { key: 'Escape' })
+      fireEvent.keyDown(repositoryButton, { key: 'a' })
+
+      expect(mockPush).not.toHaveBeenCalled()
     })
   })
 })

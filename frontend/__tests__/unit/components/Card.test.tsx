@@ -647,4 +647,44 @@ describe('Card', () => {
     expect(screen.queryByTestId('label-more')).not.toBeInTheDocument()
     expect(screen.getAllByTestId('label')).toHaveLength(5)
   })
+
+  describe('social media aria-label fallback', () => {
+    it('uses item title as aria-label when provided', () => {
+      const propsWithSocialTitle = {
+        ...baseProps,
+        social: [
+          { title: 'GitHub Profile', url: 'https://github.com/test', icon: MockIcon as IconType },
+        ],
+      }
+      render(<Card {...propsWithSocialTitle} />)
+      const socialLink = screen.getByRole('link', { name: 'GitHub Profile' })
+      expect(socialLink).toHaveAttribute('aria-label', 'GitHub Profile')
+    })
+
+    it('uses fallback aria-label when item title is empty', () => {
+      const propsWithEmptySocialTitle = {
+        ...baseProps,
+        social: [{ title: '', url: 'https://github.com/test', icon: MockIcon as IconType }],
+      }
+      render(<Card {...propsWithEmptySocialTitle} />)
+      const socialLink = screen.getByRole('link', { name: 'Social media link' })
+      expect(socialLink).toHaveAttribute('aria-label', 'Social media link')
+    })
+
+    it('uses fallback aria-label when item title is undefined', () => {
+      const propsWithUndefinedSocialTitle = {
+        ...baseProps,
+        social: [
+          {
+            title: undefined as unknown as string,
+            url: 'https://github.com/test',
+            icon: MockIcon as IconType,
+          },
+        ],
+      }
+      render(<Card {...propsWithUndefinedSocialTitle} />)
+      const socialLink = screen.getByRole('link', { name: 'Social media link' })
+      expect(socialLink).toHaveAttribute('aria-label', 'Social media link')
+    })
+  })
 })

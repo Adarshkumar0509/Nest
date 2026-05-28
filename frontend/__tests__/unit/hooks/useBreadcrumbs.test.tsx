@@ -91,6 +91,33 @@ describe('useBreadcrumbs', () => {
     })
   })
 
+  describe('HIDDEN_SEGMENTS', () => {
+    test('shows Community in breadcrumbs for paths under /community', () => {
+      ;(usePathname as jest.Mock).mockReturnValue('/community/forum')
+
+      const { result } = renderHook(() => useBreadcrumbs(), { wrapper })
+
+      expect(result.current).toEqual([
+        { title: 'Home', path: '/' },
+        { title: 'Community', path: '/community' },
+        { title: 'Forum', path: '/community/forum' },
+      ])
+    })
+    test('hides mentees and other HIDDEN_SEGMENTS but keeps Community visible', () => {
+      ;(usePathname as jest.Mock).mockReturnValue('/community/mentees/profile')
+
+      const { result } = renderHook(() => useBreadcrumbs(), { wrapper })
+
+      const titles = result.current.map((item) => item.title)
+      expect(titles).not.toContain('Mentees')
+      expect(result.current).toEqual([
+        { title: 'Home', path: '/' },
+        { title: 'Community', path: '/community' },
+        { title: 'Profile', path: '/community/mentees/profile' },
+      ])
+    })
+  })
+
   describe('Edge cases', () => {
     test('handles null pathname', () => {
       ;(usePathname as jest.Mock).mockReturnValue(null)

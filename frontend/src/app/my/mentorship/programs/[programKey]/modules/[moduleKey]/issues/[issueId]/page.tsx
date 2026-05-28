@@ -1,41 +1,86 @@
 'use client'
 
 import { useQuery } from '@apollo/client/react'
+import { BreadcrumbStyleProvider } from 'contexts/BreadcrumbContext'
+import { useAccessControl } from 'hooks/useAccessControl'
 import { useIssueMutations } from 'hooks/useIssueMutations'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { FaCodeBranch, FaLink, FaPlus, FaTags, FaXmark } from 'react-icons/fa6'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState } from 'react'
+import {
+  FaCodeBranch,
+  FaChevronDown,
+  FaChevronUp,
+  FaLink,
+  FaPlus,
+  FaTags,
+  FaXmark,
+} from 'react-icons/fa6'
 import { HiUserGroup } from 'react-icons/hi'
-import { ErrorDisplay } from 'app/global-error'
-import { GetModuleIssueViewDocument } from 'types/__generated__/issueQueries.generated'
+import { ErrorDisplay, handleAppError } from 'app/global-error'
+import { GetManagementModuleIssueViewDocument } from 'types/__generated__/issueQueries.generated'
+import { GetManagementProgramAdminsAndModulesDocument } from 'types/__generated__/moduleQueries.generated'
+import type { ExtendedSession } from 'types/auth'
+import { isForbiddenGraphQLError } from 'utils/helpers/handleGraphQLError'
+import AccessDeniedDisplay from 'components/AccessDeniedDisplay'
 import ActionButton from 'components/ActionButton'
 import AnchorTitle from 'components/AnchorTitle'
 import { LabelList } from 'components/LabelList'
 import LoadingSpinner from 'components/LoadingSpinner'
 import Markdown from 'components/MarkdownWrapper'
+import MentorshipPullRequest from 'components/MentorshipPullRequest'
 import SecondaryCard from 'components/SecondaryCard'
-import { TruncatedText } from 'components/TruncatedText'
 
 const ModuleIssueDetailsPage = () => {
   const params = useParams<{ programKey: string; moduleKey: string; issueId: string }>()
+  const { data: session, status: sessionStatus } = useSession() as {
+    data: ExtendedSession | null
+    status: string
+  }
+  const [hasMorePRs, setHasMorePRs] = useState(true)
+  const [visibleCount, setVisibleCount] = useState(4)
+  const [isFetchingMore, setIsFetchingMore] = useState(false)
+  const limit = 4
   const { programKey, moduleKey, issueId } = params
+  const currentUserLogin = session?.user?.login
+
+  const {
+    data: accessData,
+    loading: accessLoading,
+    error: accessError,
+  } = useQuery(GetManagementProgramAdminsAndModulesDocument, {
+    variables: { programKey, moduleKey },
+    skip: !programKey || !moduleKey,
+    fetchPolicy: 'network-only',
+  })
+
+  const hasAccess = useAccessControl(accessData, sessionStatus, currentUserLogin, accessLoading)
+
+  useEffect(() => {
+    if (accessError && !isForbiddenGraphQLError(accessError)) {
+      handleAppError(accessError)
+    }
+  }, [accessError])
 
   const formatDeadline = (deadline: string | null) => {
     if (!deadline) return { text: 'No deadline set', color: 'text-gray-600 dark:text-gray-300' }
 
-    const deadlineDate = new Date(deadline)
-    const today = new Date()
+    const now = new Date()
 
-    const deadlineUTC = new Date(
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+
+    const deadlineDate = new Date(deadline)
+
+    const deadlineUTC = Date.UTC(
       deadlineDate.getUTCFullYear(),
       deadlineDate.getUTCMonth(),
       deadlineDate.getUTCDate()
     )
-    const todayUTC = new Date(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
 
-    const isOverdue = deadlineUTC < todayUTC
-    const daysLeft = Math.ceil((deadlineUTC.getTime() - todayUTC.getTime()) / (1000 * 60 * 60 * 24))
+    const daysLeft = Math.ceil((deadlineUTC - todayUTC) / (1000 * 60 * 60 * 24))
+    const isOverdue = daysLeft < 0
 
     let statusText: string
     if (isOverdue) {
@@ -62,12 +107,26 @@ const ModuleIssueDetailsPage = () => {
       color,
     }
   }
-  const { data, loading, error } = useQuery(GetModuleIssueViewDocument, {
-    variables: { programKey, moduleKey, number: Number(issueId) },
-    skip: !issueId,
+  const { data, loading, error, fetchMore } = useQuery(GetManagementModuleIssueViewDocument, {
+    variables: {
+      programKey,
+      moduleKey,
+      number: Number(issueId),
+      limit,
+      offset: 0,
+    },
+    skip: !issueId || !hasAccess,
     fetchPolicy: 'cache-first',
     nextFetchPolicy: 'cache-and-network',
   })
+
+  useEffect(() => {
+    const prCount = data?.managementModule?.issueByNumber?.pullRequests?.length
+    if (prCount == null) return
+    if (prCount <= limit) {
+      setHasMorePRs(prCount >= limit)
+    }
+  }, [data, limit])
 
   const {
     assignIssue,
@@ -84,8 +143,8 @@ const ModuleIssueDetailsPage = () => {
     setDeadlineInput,
   } = useIssueMutations({ programKey, moduleKey, issueId })
 
-  const issue = data?.getModule?.issueByNumber
-  const taskDeadline = data?.getModule?.taskDeadline as string | undefined
+  const issue = data?.managementModule?.issueByNumber
+  const taskDeadline = (data?.managementModule?.taskDeadline as string | undefined) ?? null
 
   const getButtonClassName = (disabled: boolean) =>
     `inline-flex items-center justify-center rounded-md border p-1.5 text-sm ${
@@ -94,10 +153,46 @@ const ModuleIssueDetailsPage = () => {
         : 'border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800'
     }`
 
+  if (sessionStatus === 'loading' || accessLoading || hasAccess === undefined) {
+    return <LoadingSpinner />
+  }
+
+  if (accessError && isForbiddenGraphQLError(accessError)) {
+    return (
+      <ErrorDisplay
+        statusCode={403}
+        title="Access Denied"
+        message="You do not have permission to view this issue in the mentorship workspace."
+      />
+    )
+  }
+
+  if (accessError) {
+    return (
+      <ErrorDisplay
+        statusCode={500}
+        title="Error Loading Access Information"
+        message="Failed to verify access permissions. Please try again later."
+      />
+    )
+  }
+
+  if (!hasAccess) {
+    return (
+      <AccessDeniedDisplay
+        title="Access Denied"
+        message="Only program admins and module mentors can access this page."
+      />
+    )
+  }
+
+  if (loading && !issue) {
+    return <LoadingSpinner />
+  }
+
   if (error) {
     return <ErrorDisplay statusCode={500} title="Error Loading Issue" message={error.message} />
   }
-  if (loading) return <LoadingSpinner />
   if (!issue)
     return <ErrorDisplay statusCode={404} title="Issue Not Found" message="Issue not found" />
 
@@ -112,26 +207,10 @@ const ModuleIssueDetailsPage = () => {
     issueStatusLabel = 'Open'
   } else if (issue.isMerged) {
     issueStatusClass = 'bg-[#8657E5] text-white'
-    issueStatusLabel = 'Merged'
+    issueStatusLabel = 'Closed'
   } else {
     issueStatusClass = 'bg-[#DA3633] text-white'
     issueStatusLabel = 'Closed'
-  }
-
-  const getPRStatus = (pr: Exclude<typeof issue.pullRequests, undefined>[0]) => {
-    let backgroundColor: string
-    let label: string
-    if (pr.state === 'closed' && pr.mergedAt) {
-      backgroundColor = '#8657E5'
-      label = 'Merged'
-    } else if (pr.state === 'closed') {
-      backgroundColor = '#DA3633'
-      label = 'Closed'
-    } else {
-      backgroundColor = '#238636'
-      label = 'Open'
-    }
-    return { backgroundColor, label }
   }
 
   const getAssignButtonTitle = (assigning: boolean) => {
@@ -147,154 +226,286 @@ const ModuleIssueDetailsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white p-8 text-gray-700 dark:bg-[#212529] dark:text-gray-300">
-      <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold sm:text-3xl">
-              <span className="break-words">{issue.title}</span>
-            </h1>
-            <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
-              <span>
-                {issue.organizationName}/{issue.repositoryName} • #{issue.number}
-              </span>
-              <span
-                className={`inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium ${issueStatusClass}`}
-              >
-                {issueStatusLabel}
-              </span>
+    <BreadcrumbStyleProvider className="bg-white dark:bg-[#212529]">
+      <div className="min-h-screen bg-white p-8 text-gray-700 dark:bg-[#212529] dark:text-gray-300">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-bold sm:text-3xl">
+                <span className="break-words">{issue.title}</span>
+              </h1>
+              <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
+                <span>
+                  {issue.organizationName}/{issue.repositoryName} • #{issue.number}
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium ${issueStatusClass}`}
+                >
+                  {issueStatusLabel}
+                </span>
+              </div>
             </div>
+            <ActionButton url={issue.url}>
+              <FaLink className="mr-2 inline-block" /> View on GitHub
+            </ActionButton>
           </div>
-          <ActionButton url={issue.url} tooltipLabel="View on GitHub">
-            <FaLink className="mr-2 inline-block" /> View on GitHub
-          </ActionButton>
-        </div>
 
-        <SecondaryCard title={<AnchorTitle title="Description" />}>
-          <div className="prose dark:prose-invert line-clamp-[15] max-w-none">
-            <Markdown content={issue.body || 'No description.'} />
-          </div>
-        </SecondaryCard>
-
-        <SecondaryCard title={<AnchorTitle title="Task Timeline" />}>
-          <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
-            <div>
-              <span className="font-medium">Assigned:</span>{' '}
-              <span>
-                {data?.getModule?.taskAssignedAt
-                  ? new Date(data.getModule.taskAssignedAt).toLocaleDateString()
-                  : 'Not assigned'}
-              </span>
+          <SecondaryCard title={<AnchorTitle title="Description" />}>
+            <div className="prose dark:prose-invert line-clamp-[15] max-w-none">
+              <Markdown content={issue.body || 'No description.'} />
             </div>
+          </SecondaryCard>
 
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center">
-                <span className="font-medium">Deadline: </span>
-                {isEditingDeadline && canEditDeadline ? (
-                  <div className="inline-flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={deadlineInput}
-                      onChange={async (e) => {
-                        const newValue = e.target.value
-                        setDeadlineInput(newValue)
+          <SecondaryCard title={<AnchorTitle title="Task Timeline" />}>
+            <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
+              <div>
+                <span className="font-medium">Assigned:</span>{' '}
+                <span>
+                  {data?.managementModule?.taskAssignedAt
+                    ? new Date(data.managementModule.taskAssignedAt).toLocaleDateString()
+                    : 'Not assigned'}
+                </span>
+              </div>
 
-                        if (!settingDeadline && !clearingDeadline && issueId) {
-                          if (newValue) {
-                            const [year, month, day] = newValue.split('-').map(Number)
-                            const utcEndOfDay = new Date(
-                              Date.UTC(year, month - 1, day, 23, 59, 59, 999)
-                            )
-                            const iso = utcEndOfDay.toISOString()
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center">
+                  <span className="font-medium">Deadline: </span>
+                  {isEditingDeadline && canEditDeadline ? (
+                    <div className="inline-flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={deadlineInput}
+                        onChange={async (e) => {
+                          const newValue = e.target.value
+                          setDeadlineInput(newValue)
 
-                            await setTaskDeadlineMutation({
-                              variables: {
-                                programKey,
-                                moduleKey,
-                                issueNumber: Number(issueId),
-                                deadlineAt: iso,
-                              },
-                            })
-                          } else {
-                            // Clear deadline
-                            await clearTaskDeadlineMutation({
-                              variables: {
-                                programKey,
-                                moduleKey,
-                                issueNumber: Number(issueId),
-                              },
-                            })
+                          if (!settingDeadline && !clearingDeadline && issueId) {
+                            if (newValue) {
+                              const [year, month, day] = newValue.split('-').map(Number)
+                              const utcEndOfDay = new Date(
+                                Date.UTC(year, month - 1, day, 23, 59, 59, 999)
+                              )
+                              const iso = utcEndOfDay.toISOString()
+
+                              await setTaskDeadlineMutation({
+                                variables: {
+                                  programKey,
+                                  moduleKey,
+                                  issueNumber: Number(issueId),
+                                  deadlineAt: iso,
+                                },
+                              })
+                            } else {
+                              await clearTaskDeadlineMutation({
+                                variables: {
+                                  programKey,
+                                  moduleKey,
+                                  issueNumber: Number(issueId),
+                                },
+                              })
+                            }
                           }
-                        }
-                      }}
-                      min={new Date().toISOString().slice(0, 10)}
-                      className="h-8 rounded border border-gray-300 px-2 dark:border-gray-600"
-                    />
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={!canEditDeadline}
-                    onClick={() => {
-                      if (canEditDeadline) {
+                        }}
+                        min={new Date().toISOString().slice(0, 10)}
+                        className="h-8 rounded border border-gray-300 px-2 dark:border-gray-600"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!canEditDeadline}
+                      onClick={() => {
                         setDeadlineInput(
                           taskDeadline ? new Date(taskDeadline).toISOString().slice(0, 10) : ''
                         )
                         setIsEditingDeadline(true)
-                      }
-                    }}
-                    className={`inline-flex items-center gap-2 rounded px-2 py-1 text-left transition-colors ${
-                      canEditDeadline
-                        ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800'
-                        : 'cursor-not-allowed font-medium'
-                    }`}
-                  >
-                    {(() => {
-                      const { text, color } = formatDeadline(taskDeadline)
-                      return <span className={`font-normal ${color}`}>{text}</span>
-                    })()}
-                  </button>
-                )}
+                      }}
+                      className={`inline-flex items-center gap-2 rounded px-2 py-1 text-left transition-colors ${
+                        canEditDeadline
+                          ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800'
+                          : 'cursor-not-allowed font-medium'
+                      }`}
+                    >
+                      {(() => {
+                        const { text, color } = formatDeadline(taskDeadline)
+                        return <span className={`font-normal ${color}`}>{text}</span>
+                      })()}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </SecondaryCard>
+          </SecondaryCard>
 
-        <div className="mb-8 rounded-lg bg-gray-100 p-6 shadow-md dark:bg-gray-800">
-          <h2 className="mb-4 text-2xl font-semibold">
-            <div className="flex items-center">
-              <div className="flex flex-row items-center gap-2">
-                <FaTags className="mr-2 h-5 w-5" />
-              </div>
-              <span>Labels</span>
-            </div>
-          </h2>
-          <LabelList entityKey={`issue-${issueId}`} labels={labels} maxVisible={5} />
-        </div>
-
-        {assignees.length > 0 && (
           <div className="mb-8 rounded-lg bg-gray-100 p-6 shadow-md dark:bg-gray-800">
+            <h2 className="mb-4 text-2xl font-semibold">
+              <div className="flex items-center">
+                <div className="flex flex-row items-center gap-2">
+                  <FaTags className="mr-2 h-5 w-5" />
+                </div>
+                <span>Labels</span>
+              </div>
+            </h2>
+            <LabelList entityKey={`issue-${issueId}`} labels={labels} maxVisible={5} />
+          </div>
+
+          {assignees.length > 0 && (
+            <div className="mb-8 rounded-lg bg-gray-100 p-6 shadow-md dark:bg-gray-800">
+              <h2 className="mb-4 text-2xl font-semibold">
+                <div className="flex items-center">
+                  <div className="flex flex-row items-center gap-2">
+                    <HiUserGroup className="mr-2 h-5 w-5" />
+                  </div>
+                  <span>Assignees</span>
+                </div>
+              </h2>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {assignees.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-gray-200 p-3 dark:bg-gray-700"
+                  >
+                    <Link
+                      href={`/my/mentorship/programs/${programKey}/modules/${moduleKey}/mentees/${a.login}`}
+                      className="inline-flex items-center gap-2 text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      {a.avatarUrl ? (
+                        <Image
+                          src={a.avatarUrl}
+                          alt=""
+                          width={32}
+                          height={32}
+                          className="rounded-full"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-gray-400" aria-hidden="true" />
+                      )}
+                      <span className="text-sm font-medium">{a.login || a.name}</span>
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label={`Unassign @${a.login}`}
+                      disabled={!issueId || unassigning}
+                      onClick={async () => {
+                        await unassignIssue({
+                          variables: {
+                            programKey,
+                            moduleKey,
+                            issueNumber: Number(issueId),
+                            userLogin: a.login,
+                          },
+                        })
+                      }}
+                      className={getButtonClassName(!issueId || unassigning)}
+                      title={unassigning ? 'Unassigning…' : `Unassign @${a.login}`}
+                    >
+                      <FaXmark />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <SecondaryCard icon={FaCodeBranch} title="Pull Requests">
+            <div className="grid grid-cols-1 gap-3">
+              {(issue.pullRequests || []).slice(0, visibleCount).map((pr) => (
+                <MentorshipPullRequest key={pr.id} pr={pr} />
+              ))}
+
+              {(hasMorePRs ||
+                (issue.pullRequests || []).length > visibleCount ||
+                (visibleCount > limit && (issue.pullRequests || []).length > limit)) && (
+                <div className="mt-4 flex justify-start gap-4">
+                  {(hasMorePRs || (issue.pullRequests || []).length > visibleCount) && (
+                    <button
+                      disabled={isFetchingMore}
+                      onClick={() => {
+                        if (isFetchingMore) return
+                        const currentLength = issue.pullRequests?.length || 0
+                        if (hasMorePRs && currentLength < visibleCount + limit) {
+                          setIsFetchingMore(true)
+                          fetchMore({
+                            variables: {
+                              programKey,
+                              moduleKey,
+                              number: Number(issueId),
+                              offset: currentLength,
+                              limit,
+                            },
+                            updateQuery: (prevResult, { fetchMoreResult }) => {
+                              if (!fetchMoreResult) return prevResult
+                              const newPRs =
+                                fetchMoreResult.managementModule?.issueByNumber?.pullRequests || []
+                              if (newPRs.length < limit) setHasMorePRs(false)
+                              if (newPRs.length === 0) return prevResult
+                              return {
+                                ...prevResult,
+                                managementModule: {
+                                  ...prevResult.managementModule!,
+                                  issueByNumber: {
+                                    ...prevResult.managementModule!.issueByNumber!,
+                                    pullRequests: [
+                                      ...(prevResult.managementModule?.issueByNumber
+                                        ?.pullRequests || []),
+                                      ...newPRs,
+                                    ],
+                                  },
+                                },
+                              }
+                            },
+                          })
+                            .catch((err) => handleAppError(err))
+                            .finally(() => setIsFetchingMore(false))
+                        }
+                        setVisibleCount((prev) => prev + limit)
+                      }}
+                      type="button"
+                      className={`flex items-center bg-transparent px-2 py-1 text-blue-400 hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${isFetchingMore ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      {isFetchingMore ? 'Loading...' : 'Show more'}{' '}
+                      <FaChevronDown aria-hidden="true" className="ml-2 text-sm" />
+                    </button>
+                  )}
+
+                  {visibleCount > limit && (issue.pullRequests || []).length > limit && (
+                    <button
+                      disabled={isFetchingMore}
+                      onClick={() => setVisibleCount(limit)}
+                      type="button"
+                      className={`flex items-center bg-transparent px-2 py-1 text-blue-400 hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${isFetchingMore ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      Show less <FaChevronUp aria-hidden="true" className="ml-2 text-sm" />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {(!issue.pullRequests || issue.pullRequests.length === 0) && (
+                <span className="text-sm text-gray-400">No linked pull requests.</span>
+              )}
+            </div>
+          </SecondaryCard>
+
+          <div className="rounded-lg bg-gray-100 p-6 shadow-md dark:bg-gray-800">
             <h2 className="mb-4 text-2xl font-semibold">
               <div className="flex items-center">
                 <div className="flex flex-row items-center gap-2">
                   <HiUserGroup className="mr-2 h-5 w-5" />
                 </div>
-                <span>Assignees</span>
+                <span>Interested Users</span>
               </div>
             </h2>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {assignees.map((a) => (
+              {(data?.managementModule?.interestedUsers || []).map((u) => (
                 <div
-                  key={a.id}
+                  key={u.id}
                   className="flex items-center justify-between gap-2 rounded-lg bg-gray-200 p-3 dark:bg-gray-700"
                 >
-                  <Link
-                    href={`/my/mentorship/programs/${programKey}/modules/${moduleKey}/mentees/${a.login}`}
-                    className="inline-flex items-center gap-2 text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    {a.avatarUrl ? (
+                  <div className="inline-flex items-center gap-2">
+                    {u.avatarUrl ? (
                       <Image
-                        src={a.avatarUrl}
+                        src={u.avatarUrl}
                         alt=""
                         width={32}
                         height={32}
@@ -303,151 +514,38 @@ const ModuleIssueDetailsPage = () => {
                     ) : (
                       <div className="h-8 w-8 rounded-full bg-gray-400" aria-hidden="true" />
                     )}
-                    <span className="text-sm font-medium">{a.login || a.name}</span>
-                  </Link>
+                    <span className="text-sm font-medium">@{u.login}</span>
+                  </div>
                   <button
                     type="button"
-                    aria-label={`Unassign @${a.login}`}
-                    disabled={!issueId || unassigning}
+                    disabled={!issueId || assigning}
                     onClick={async () => {
-                      if (!issueId || unassigning) return
-                      await unassignIssue({
+                      if (!issueId || assigning) return
+                      await assignIssue({
                         variables: {
                           programKey,
                           moduleKey,
                           issueNumber: Number(issueId),
-                          userLogin: a.login,
+                          userLogin: u.login,
                         },
                       })
                     }}
-                    className={getButtonClassName(!issueId || unassigning)}
-                    title={unassigning ? 'Unassigning…' : `Unassign @${a.login}`}
+                    className={`${getButtonClassName(!issueId || assigning)} px-3 py-1`}
+                    title={getAssignButtonTitle(assigning)}
                   >
-                    <FaXmark />
+                    <FaPlus className="text-gray-500" />
+                    <span>Assign</span>
                   </button>
                 </div>
               ))}
+              {(data?.managementModule?.interestedUsers || []).length === 0 && (
+                <span className="text-sm text-gray-400">No interested users yet.</span>
+              )}
             </div>
-          </div>
-        )}
-
-        <SecondaryCard icon={FaCodeBranch} title="Pull Requests">
-          <div className="grid grid-cols-1 gap-3">
-            {issue.pullRequests?.length ? (
-              issue.pullRequests.map((pr) => (
-                <div
-                  key={pr.id}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-gray-200 p-4 dark:bg-gray-700"
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    {pr.author?.avatarUrl ? (
-                      <Image
-                        src={pr.author.avatarUrl}
-                        alt={pr.author?.login || 'Unknown'}
-                        width={32}
-                        height={32}
-                        className="flex-shrink-0 rounded-full"
-                      />
-                    ) : (
-                      <div
-                        className="h-8 w-8 flex-shrink-0 rounded-full bg-gray-400"
-                        aria-hidden="true"
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={pr.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        <TruncatedText text={pr.title} />
-                      </Link>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        by {pr.author?.login || 'Unknown'} •{' '}
-                        {new Date(pr.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const { backgroundColor, label } = getPRStatus(pr)
-                      return (
-                        <span
-                          className="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium text-white"
-                          style={{ backgroundColor }}
-                        >
-                          {label}
-                        </span>
-                      )
-                    })()}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <span className="text-sm text-gray-400">No linked pull requests.</span>
-            )}
-          </div>
-        </SecondaryCard>
-
-        <div className="rounded-lg bg-gray-100 p-6 shadow-md dark:bg-gray-800">
-          <h2 className="mb-4 text-2xl font-semibold">
-            <div className="flex items-center">
-              <div className="flex flex-row items-center gap-2">
-                <HiUserGroup className="mr-2 h-5 w-5" />
-              </div>
-              <span>Interested Users</span>
-            </div>
-          </h2>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {(data?.getModule?.interestedUsers || []).map((u) => (
-              <div
-                key={u.id}
-                className="flex items-center justify-between gap-2 rounded-lg bg-gray-200 p-3 dark:bg-gray-700"
-              >
-                <div className="inline-flex items-center gap-2">
-                  {u.avatarUrl ? (
-                    <Image
-                      src={u.avatarUrl}
-                      alt=""
-                      width={32}
-                      height={32}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <div className="h-8 w-8 rounded-full bg-gray-400" aria-hidden="true" />
-                  )}
-                  <span className="text-sm font-medium">@{u.login}</span>
-                </div>
-                <button
-                  type="button"
-                  disabled={!issueId || assigning}
-                  onClick={async () => {
-                    if (!issueId || assigning) return
-                    await assignIssue({
-                      variables: {
-                        programKey,
-                        moduleKey,
-                        issueNumber: Number(issueId),
-                        userLogin: u.login,
-                      },
-                    })
-                  }}
-                  className={`${getButtonClassName(!issueId || assigning)} px-3 py-1`}
-                  title={getAssignButtonTitle(assigning)}
-                >
-                  <FaPlus className="text-gray-500" />
-                  <span>Assign</span>
-                </button>
-              </div>
-            ))}
-            {(data?.getModule?.interestedUsers || []).length === 0 && (
-              <span className="text-sm text-gray-400">No interested users yet.</span>
-            )}
           </div>
         </div>
       </div>
-    </div>
+    </BreadcrumbStyleProvider>
   )
 }
 

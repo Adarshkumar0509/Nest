@@ -1,4 +1,5 @@
 'use client'
+
 import { useQuery } from '@apollo/client/react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -8,8 +9,19 @@ import { FaCodeFork, FaFolderOpen, FaStar } from 'react-icons/fa6'
 import { HiUserGroup } from 'react-icons/hi'
 import { handleAppError, ErrorDisplay } from 'app/global-error'
 import { GetOrganizationDataDocument } from 'types/__generated__/organizationQueries.generated'
+import type { Issue } from 'types/issue'
+import type { Milestone } from 'types/milestone'
+import type { RepositoryCardProps } from 'types/project'
+import type { PullRequest } from 'types/pullRequest'
+import type { Release } from 'types/release'
 import { formatDate } from 'utils/dateFormatter'
-import DetailsCard from 'components/CardDetailsPage'
+import Contributors from 'components/cards/Contributors'
+import Header from 'components/cards/Header'
+import IssuesMilestones from 'components/cards/IssuesMilestones'
+import Metadata from 'components/cards/Metadata'
+import PageWrapper from 'components/cards/PageWrapper'
+import RepositoriesModules from 'components/cards/RepositoriesModules'
+import Summary from 'components/cards/Summary'
 import OrganizationDetailsPageSkeleton from 'components/skeletons/OrganizationDetailsPageSkeleton'
 const OrganizationDetailsPage = () => {
   const { organizationKey } = useParams<{ organizationKey: string }>()
@@ -108,19 +120,41 @@ const OrganizationDetailsPage = () => {
   ]
 
   return (
-    <DetailsCard
-      details={organizationDetails}
-      recentIssues={recentIssues}
-      recentReleases={recentReleases}
-      recentMilestones={recentMilestones}
-      pullRequests={recentPullRequests}
-      repositories={repositories}
-      stats={organizationStats}
-      summary={organization.description}
-      title={organization.name}
-      topContributors={topContributors}
-      type="organization"
-    />
+    <PageWrapper>
+      <Header title={organization.name} isActive={true} isArchived={false} />
+
+      <Summary summary={organization.description} />
+
+      <Metadata
+        details={organizationDetails}
+        stats={organizationStats}
+        detailsTitle="Organization Details"
+      />
+
+      <Contributors topContributors={topContributors} />
+
+      <IssuesMilestones
+        recentIssues={recentIssues as Issue[]}
+        recentMilestones={recentMilestones as Milestone[]}
+        pullRequests={recentPullRequests as PullRequest[]}
+        recentReleases={
+          recentReleases?.map((release) => ({
+            ...release,
+            publishedAt: release.publishedAt as string,
+          })) as Release[]
+        }
+        showAvatar={true}
+      />
+
+      <RepositoriesModules
+        repositories={
+          repositories?.map((repo) => ({
+            ...repo,
+            organization: repo.organization ? { login: repo.organization.login } : undefined,
+          })) as RepositoryCardProps[]
+        }
+      />
+    </PageWrapper>
   )
 }
 

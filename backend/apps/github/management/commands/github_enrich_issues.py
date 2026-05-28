@@ -1,13 +1,9 @@
 """A command to update OWASP entities related repositories data."""
 
-import logging
-
 from django.core.management.base import BaseCommand
 
 from apps.common.open_ai import OpenAi
 from apps.github.models.issue import Issue
-
-logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -55,7 +51,7 @@ class Command(BaseCommand):
         update_fields += ["summary"] if (update_summary := options["update_summary"]) else []
         for idx, issue in enumerate(open_issues[offset:]):
             prefix = f"{idx + offset + 1} of {open_issues_count - offset}"
-            print(f"{prefix:<10} {issue.title}")
+            self.stdout.write(f"{prefix:<10} {issue.title}\n")
 
             if update_hint:
                 issue.generate_hint(open_ai=open_ai)

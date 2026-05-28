@@ -11,8 +11,15 @@ export const mockUserDetailsData = {
     followersCount: 10,
     followingCount: 5,
     publicRepositoriesCount: 3,
-    createdAt: 1723002473,
+    createdAt: '2024-08-07T03:47:53.000Z',
     contributionsCount: 100,
+    contributionData: {
+      '2025-01-01': 5,
+      '2025-01-02': 3,
+      '2025-01-03': 8,
+      '2025-01-04': 0,
+      '2025-01-05': 12,
+    },
     badges: [
       {
         id: '1',
@@ -34,7 +41,7 @@ export const mockUserDetailsData = {
   recentIssues: [
     {
       title: 'Test Issue',
-      createdAt: 1723002473,
+      createdAt: '2024-08-07T03:47:53.000Z',
       repositoryName: 'test-repo-1',
       url: 'https://github.com/OWASP/Nest/issues/798',
     },
@@ -46,7 +53,7 @@ export const mockUserDetailsData = {
       closedIssuesCount: 15,
       repositoryName: 'Project Repo 1',
       organizationName: 'OWASP',
-      createdAt: '2025-03-01T10:00:00Z',
+      createdAt: '2025-03-01T10:00:00.000Z',
       url: 'https://github.com/OWASP/repo-one/milestone/1',
     },
   ],
@@ -54,7 +61,7 @@ export const mockUserDetailsData = {
     {
       isPreRelease: false,
       name: 'v1.0.0',
-      publishedAt: 1723002473,
+      publishedAt: '2024-08-07T03:47:53.000Z',
       repositoryName: 'test-repo-2',
       tagName: '1.0.0',
       url: 'https://github.com/testuser/test-repo/releases/tag/1.0.0',
@@ -63,7 +70,7 @@ export const mockUserDetailsData = {
   recentPullRequests: [
     {
       id: 'mock-user-pr-1',
-      createdAt: 1723002473,
+      createdAt: '2024-08-07T03:47:53.000Z',
       repositoryName: 'test-repo-3',
       title: 'Test Pull Request',
       url: 'https://github.com/testuser/test-repo/pull/1',

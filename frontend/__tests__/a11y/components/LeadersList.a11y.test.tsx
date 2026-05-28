@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react'
 import { axe } from 'jest-axe'
+import { useTheme } from 'next-themes'
 import { ReactNode } from 'react'
 import LeadersList from 'components/LeadersList'
 
@@ -31,9 +32,18 @@ jest.mock('next/link', () => {
   }
 })
 
-describe('LeadersList a11y', () => {
+describe.each([
+  { theme: 'light', name: 'light' },
+  { theme: 'dark', name: 'dark' },
+])('LeadersList a11y ($name theme)', ({ theme }) => {
+  beforeEach(() => {
+    ;(useTheme as jest.Mock).mockReturnValue({ theme, setTheme: jest.fn() })
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  })
   it('should not have any accessibility violations', async () => {
-    const { container } = render(<LeadersList leaders={'John Doe, Jane Smith, Bob Johnson'} />)
+    const { container } = render(
+      <LeadersList entityKey="a11y-leaders" leaders={'John Doe, Jane Smith, Bob Johnson'} />
+    )
 
     const results = await axe(container)
 

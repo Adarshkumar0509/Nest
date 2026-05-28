@@ -66,7 +66,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         style={{ minHeight: '100vh' }}
@@ -84,7 +84,7 @@ export default function RootLayout({
           </BreadcrumbRoot>
         </Providers>
       </body>
-      <GoogleAnalytics gaId={GTM_ID} />
+      {GTM_ID && <GoogleAnalytics gaId={GTM_ID} />}
     </html>
   )
 }

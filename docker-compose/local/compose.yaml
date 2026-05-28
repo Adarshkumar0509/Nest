@@ -23,7 +23,7 @@ services:
       DJANGO_DB_PASSWORD: ${DJANGO_DB_PASSWORD:-nest_user_dev_password}
       DJANGO_DB_PORT: ${DJANGO_DB_PORT:-5432}
       DJANGO_DB_USER: ${DJANGO_DB_USER:-nest_user_dev}
-      DJANGO_REDIS_HOST: ${DJANGO_REDIS_HOST:-nest-cache}
+      DJANGO_REDIS_HOST: ${DJANGO_REDIS_HOST:-cache}
       DJANGO_REDIS_PASSWORD: ${DJANGO_REDIS_PASSWORD:-nest-cache-password}
     networks:
       - nest-network
@@ -39,7 +39,7 @@ services:
         redis-server --requirepass $$REDIS_PASSWORD --maxmemory 25mb --maxmemory-policy allkeys-lru
       '
     container_name: nest-cache
-    image: redis:8.0.5-alpine3.21
+    image: redis:8.8.0-alpine3.23@sha256:9156d3e4cab19c9b5507e18d7fcfca90c17762914270a3e34c08397ebdf746ff
     environment:
       REDIS_PASSWORD: ${DJANGO_REDIS_PASSWORD:-nest-cache-password}
     healthcheck:
@@ -54,7 +54,7 @@ services:
 
   db:
     container_name: nest-db
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg16@sha256:00ba258a66dac104fd5171074a0084462a64a1369d8513f3d0a634e2f24d15bc
     environment:
       POSTGRES_DB: ${DJANGO_DB_NAME:-nest_db_dev}
       POSTGRES_PASSWORD: ${DJANGO_DB_PASSWORD:-nest_user_dev_password}
@@ -73,7 +73,7 @@ services:
     container_name: nest-docs
     command: >
       sh -c '
-        mkdocs serve -a 0.0.0.0:8001
+        mkdocs serve -a 0.0.0.0:8001 -f .mkdocs.yaml
       '
     build:
       context: ../../
@@ -84,6 +84,11 @@ services:
       - 8001:8001
     volumes:
       - ../../docs:/home/owasp/docs
+      - ../../backend:/home/owasp/backend:ro
+      - ../../frontend:/home/owasp/frontend:ro
+      - ../../README.md:/home/owasp/README.md:ro
+      - ../../CODE_OF_CONDUCT.md:/home/owasp/CODE_OF_CONDUCT.md:ro
+      - ../../CONTRIBUTING.md:/home/owasp/CONTRIBUTING.md:ro
       - docs-venv:/home/owasp/.venv
 
   frontend:

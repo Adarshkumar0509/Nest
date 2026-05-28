@@ -9,10 +9,28 @@ import { FaCodeFork, FaFolderOpen, FaStar } from 'react-icons/fa6'
 import { HiUserGroup } from 'react-icons/hi'
 import { ErrorDisplay, handleAppError } from 'app/global-error'
 import { GetProjectDocument } from 'types/__generated__/projectQueries.generated'
+import type { HealthMetricsProps } from 'types/healthMetrics'
+import type { Issue } from 'types/issue'
+import type { Milestone } from 'types/milestone'
+import type { RepositoryCardProps } from 'types/project'
+import type { PullRequest } from 'types/pullRequest'
+import type { Release } from 'types/release'
 import { getContributionStats } from 'utils/contributionDataUtils'
 import { formatDate, getDateRange } from 'utils/dateFormatter'
-import DetailsCard from 'components/CardDetailsPage'
+import { IS_PROJECT_HEALTH_ENABLED } from 'utils/env.client'
+import Contributions from 'components/cards/Contributions'
+import Contributors from 'components/cards/Contributors'
+import Header from 'components/cards/Header'
+import IssuesMilestones from 'components/cards/IssuesMilestones'
+import Leaders from 'components/cards/Leaders'
+import Metadata from 'components/cards/Metadata'
+import PageWrapper from 'components/cards/PageWrapper'
+import RepositoriesModules from 'components/cards/RepositoriesModules'
+import Summary from 'components/cards/Summary'
+import Tags from 'components/cards/Tags'
+import HealthMetrics from 'components/HealthMetrics'
 import LoadingSpinner from 'components/LoadingSpinner'
+import SponsorCard from 'components/SponsorCard'
 
 const ProjectDetailsPage = () => {
   const { projectKey } = useParams<{ projectKey: string }>()
@@ -102,29 +120,60 @@ const ProjectDetailsPage = () => {
   )
 
   return (
-    <DetailsCard
-      contributionData={project.contributionData}
-      contributionStats={contributionStats}
-      details={projectDetails}
-      endDate={endDate}
-      entityKey={project.key}
-      entityLeaders={project.entityLeaders}
-      healthMetricsData={project.healthMetricsList}
-      isActive={project.isActive}
-      languages={project.languages}
-      pullRequests={project.recentPullRequests}
-      recentIssues={project.recentIssues}
-      recentMilestones={project.recentMilestones}
-      recentReleases={project.recentReleases}
-      repositories={project.repositories}
-      startDate={startDate}
-      stats={projectStats}
-      summary={project.summary}
-      title={project.name}
-      topContributors={topContributors}
-      topics={project.topics}
-      type="project"
-    />
+    <PageWrapper>
+      <Header
+        title={project.name}
+        isActive={project.isActive}
+        isArchived={false}
+        showHealthMetrics={true}
+      />
+
+      <Summary summary={project.summary} />
+
+      <Metadata details={projectDetails} stats={projectStats} detailsTitle="Project Details" />
+
+      <Tags languages={project.languages} topics={project.topics} />
+
+      <Leaders entityLeaders={project.entityLeaders} />
+
+      <Contributions
+        hasContributions={
+          !!(
+            (contributionStats && contributionStats.total > 0) ||
+            (project.contributionData && Object.keys(project.contributionData).length > 0)
+          )
+        }
+        contributionStats={contributionStats}
+        contributionData={project.contributionData}
+        startDate={startDate}
+        endDate={endDate}
+        title="Project Contribution Activity"
+      />
+
+      <Contributors topContributors={topContributors} />
+
+      <IssuesMilestones
+        recentIssues={project.recentIssues as unknown as Issue[]}
+        recentMilestones={project.recentMilestones as unknown as Milestone[]}
+        pullRequests={project.recentPullRequests as unknown as PullRequest[]}
+        recentReleases={project.recentReleases as unknown as Release[]}
+        showAvatar={true}
+      />
+
+      <RepositoriesModules
+        repositories={project.repositories as unknown as RepositoryCardProps[]}
+      />
+
+      {IS_PROJECT_HEALTH_ENABLED &&
+        project.healthMetricsList &&
+        project.healthMetricsList.length > 0 && (
+          <HealthMetrics data={project.healthMetricsList as unknown as HealthMetricsProps[]} />
+        )}
+
+      {project.key && project.name && (
+        <SponsorCard target={project.key} title={project.name} type="project" />
+      )}
+    </PageWrapper>
   )
 }
 

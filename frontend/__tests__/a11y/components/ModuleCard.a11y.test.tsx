@@ -1,0 +1,58 @@
+import { render } from '@testing-library/react'
+import { axe } from 'jest-axe'
+import { useTheme } from 'next-themes'
+import { ExperienceLevelEnum } from 'types/__generated__/graphql'
+import ModuleCard from 'components/ModuleCard'
+
+jest.mock('@apollo/client/react', () => ({
+  useMutation: jest.fn(() => [jest.fn()]),
+}))
+const mockModules = [
+  {
+    id: '1',
+    key: 'module-1',
+    name: 'Intro to Web Security',
+    description: 'A beginner module',
+    experienceLevel: ExperienceLevelEnum.Beginner,
+    startedAt: '2025-01-01',
+    endedAt: '2025-03-01',
+    mentors: [
+      {
+        id: 'm1',
+        login: 'mentor1',
+        name: 'Mentor One',
+        avatarUrl: 'https://example.com/m1.png',
+      },
+    ],
+    mentees: [
+      {
+        id: 'e1',
+        login: 'mentee1',
+        name: 'Mentee One',
+        avatarUrl: 'https://example.com/me1.png',
+      },
+    ],
+    tags: ['web'],
+    domains: ['security'],
+  },
+]
+
+describe.each([
+  { theme: 'light', name: 'light' },
+  { theme: 'dark', name: 'dark' },
+])('ModuleCard a11y ($name theme)', ({ theme }) => {
+  beforeEach(() => {
+    ;(useTheme as jest.Mock).mockReturnValue({ theme, setTheme: jest.fn() })
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+  })
+  it('should have no accessibility violations', async () => {
+    const { container } = render(
+      <main>
+        <ModuleCard modules={mockModules} />
+      </main>
+    )
+
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+})

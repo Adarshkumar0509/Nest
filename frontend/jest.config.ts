@@ -26,19 +26,19 @@ const config: Config = {
   coverageReporters: ['cobertura', 'lcov', 'text'],
   coverageThreshold: {
     global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80,
+      branches: 95,
+      functions: 95,
+      lines: 95,
+      statements: 95,
     },
   },
   globals: {},
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/__tests__/jest.setup.ts'],
   testEnvironment: 'jest-environment-jsdom',
   testPathIgnorePatterns: [
     '<rootDir>/__tests__/unit/data/',
-    '<rootDir>/__tests__/e2e/',
     '<rootDir>/__tests__/mockData/',
+    '<rootDir>/__tests__/jest.setup.ts',
   ],
   transform: {
     '^.+\\.tsx?$': '@swc/jest',

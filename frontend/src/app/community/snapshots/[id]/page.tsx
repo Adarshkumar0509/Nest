@@ -1,23 +1,26 @@
 'use client'
 import { useQuery } from '@apollo/client/react'
 import { useRouter, useParams } from 'next/navigation'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { FaCalendar, FaRightToBracket } from 'react-icons/fa6'
 import { handleAppError, ErrorDisplay } from 'app/global-error'
 import { GetSnapshotDetailsDocument } from 'types/__generated__/snapshotQueries.generated'
 import type { Chapter } from 'types/chapter'
 import type { Project } from 'types/project'
+import type { Release as ReleaseType } from 'types/release'
 import { level } from 'utils/data'
 import { formatDate } from 'utils/dateFormatter'
 import { getFilteredIcons, handleSocialUrls } from 'utils/utility'
 import Card from 'components/Card'
 import ChapterMapWrapper from 'components/ChapterMapWrapper'
 import LoadingSpinner from 'components/LoadingSpinner'
-import Release from 'components/Release'
+import { ReleasesSection } from 'components/SnapshotReleaseSection'
 
 const SnapshotDetailsPage: React.FC = () => {
   const { id: snapshotKey } = useParams<{ id: string }>()
   const router = useRouter()
+
+  const [showAllReleases, setShowAllReleases] = useState(false)
 
   const {
     data,
@@ -28,6 +31,9 @@ const SnapshotDetailsPage: React.FC = () => {
   })
 
   const snapshot = data?.snapshot
+  useEffect(() => {
+    setShowAllReleases(false)
+  }, [snapshot])
 
   useEffect(() => {
     if (graphQLRequestError) {
@@ -52,10 +58,12 @@ const SnapshotDetailsPage: React.FC = () => {
     return (
       <Card
         button={submitButton}
-        cardKey={project.key}
+        cardKey={project.key ?? project.name}
         icons={filteredIcons}
-        level={level[`${project.level.toLowerCase() as keyof typeof level}`]}
-        summary={project.summary}
+        level={
+          project.level ? level[`${project.level.toLowerCase() as keyof typeof level}`] : undefined
+        }
+        summary={project.summary ?? ''}
         title={project.name}
         topContributors={project.topContributors}
         url={`/projects/${project.key}`}
@@ -66,7 +74,7 @@ const SnapshotDetailsPage: React.FC = () => {
   const renderChapterCard = (chapter: Chapter) => {
     const params: string[] = ['updatedAt']
     const filteredIcons = getFilteredIcons(chapter, params)
-    const formattedUrls = handleSocialUrls(chapter.relatedUrls)
+    const formattedUrls = handleSocialUrls(chapter.relatedUrls ?? [])
 
     const handleButtonClick = () => {
       router.push(`/chapters/${chapter.key}`)
@@ -84,7 +92,7 @@ const SnapshotDetailsPage: React.FC = () => {
         cardKey={chapter.key}
         icons={filteredIcons}
         social={formattedUrls}
-        summary={chapter.summary}
+        summary={chapter.summary ?? ''}
         title={chapter.name}
         url={`/chapters/${chapter.key}`}
       />
@@ -142,7 +150,7 @@ const SnapshotDetailsPage: React.FC = () => {
           </h2>
           <div className="mb-4">
             <ChapterMapWrapper
-              geoLocData={snapshot.newChapters}
+              geoLocData={snapshot.newChapters as unknown as Chapter[]}
               showLocal={false}
               showLocationSharing={true}
               style={{ height: '400px', width: '100%', zIndex: '0' }}
@@ -152,7 +160,9 @@ const SnapshotDetailsPage: React.FC = () => {
             {snapshot.newChapters
               .filter((chapter) => chapter.isActive)
               .map((chapter) => (
-                <React.Fragment key={chapter.key}>{renderChapterCard(chapter)}</React.Fragment>
+                <React.Fragment key={chapter.key}>
+                  {renderChapterCard(chapter as unknown as Chapter)}
+                </React.Fragment>
               ))}
           </div>
         </div>
@@ -178,18 +188,13 @@ const SnapshotDetailsPage: React.FC = () => {
           <h2 className="mb-4 text-2xl font-semibold text-gray-700 dark:text-gray-200">
             New Releases
           </h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {snapshot.newReleases.map((release, index) => {
-              return (
-                <Release
-                  key={release.id || `${release.tagName}-${release.repositoryName}-${index}`}
-                  release={release}
-                  showAvatar={true}
-                  index={index}
-                />
-              )
-            })}
-          </div>
+          {
+            <ReleasesSection
+              releases={snapshot.newReleases as ReleaseType[]}
+              showAll={showAllReleases}
+              onToggle={() => setShowAllReleases((p) => !p)}
+            />
+          }
         </div>
       )}
     </div>
