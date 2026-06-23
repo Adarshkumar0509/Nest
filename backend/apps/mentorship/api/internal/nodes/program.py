@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 
+from apps.common.graphql.validators import validate_date_range
 from apps.github.api.internal.nodes.milestone import MilestoneNode  # noqa: TC001
 from apps.github.models.milestone import Milestone
 from apps.mentorship.api.internal.nodes.enum import (
@@ -82,6 +83,10 @@ class CreateProgramInput:
     mentees_limit: int
     started_at: datetime
     tags: list[str] = strawberry.field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """Validate date range on instantiation."""
+        validate_date_range(self.started_at, self.ended_at)
 
 
 @strawberry.input

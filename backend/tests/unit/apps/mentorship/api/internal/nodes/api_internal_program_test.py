@@ -102,9 +102,9 @@ class TestProgramInputNodes:
         create_input = CreateProgramInput(
             name="New Program",
             description="Description for new program",
-            ended_at=datetime.now(UTC),
+            started_at=datetime(2026, 1, 1, tzinfo=UTC),
+            ended_at=datetime(2026, 6, 30, tzinfo=UTC),
             mentees_limit=5,
-            started_at=datetime.now(UTC),
         )
         assert create_input.domains == []
         assert create_input.tags == []
@@ -127,9 +127,9 @@ class TestProgramInputNodes:
             key="update-program-key",
             name="Updated Program",
             description="Updated description",
-            ended_at=datetime.now(UTC),
+            started_at=datetime(2026, 1, 1, tzinfo=UTC),
+            ended_at=datetime(2026, 6, 30, tzinfo=UTC),
             mentees_limit=12,
-            started_at=datetime.now(UTC),
             status=ProgramStatusEnum.COMPLETED,
         )
         assert update_input.domains is None
